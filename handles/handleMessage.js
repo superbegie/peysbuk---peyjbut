@@ -65,11 +65,14 @@ const handleMessage = async (event, pageAccessToken) => {
   const normalizedCommand = commandName.toLowerCase();
   
   try {
-    const command = commands.get(normalizedCommand) || commands.get('ai');
+    const command = commands.get(normalizedCommand);
     
     if (command) {
-      const commandArgs = isCommand || normalizedCommand === 'ai' ? args : [messageText];
-      await command.execute(senderId, commandArgs, pageAccessToken, event, sendMessage, imageCache);
+      // If it's a recognized command, use the parsed args
+      await command.execute(senderId, args, pageAccessToken, event, sendMessage, imageCache);
+    } else if (commands.has('ai')) {
+      // Fallback to AI with full message text
+      await commands.get('ai').execute(senderId, [messageText], pageAccessToken, event, sendMessage, imageCache);
     } else {
       await sendMessage(senderId, { text: 'Unknown command. Type "help" for available commands.' }, pageAccessToken);
     }
