@@ -1,177 +1,127 @@
-const https = require('https');
-const { createReadStream, statSync } = require('fs');
-const { basename } = require('path');
+const fs = require('fs');
+const path = require('path');
 
-// Reusable HTTPS agent with modern settings
-const httpsAgent = new https.Agent({
-  family: 4,
-  keepAlive: true,
-  maxSockets: 50,
-  timeout: 30000
-});
+const API_URL = 'https://graph.facebook.com/v23.0/me/messages';
+const UPLOAD_URL = 'https://graph.facebook.com/v23.0/me/message_attachments';
 
-// Modern fetch-like wrapper for HTTP requests
-const sendRequest = async ({ method = 'POST', endpoint, data, token, isFormData = false }) => {
-  const url = `https://graph.facebook.com/v23.0${endpoint}${endpoint.includes('?') ? '&' : '?'}access_token=${token}`;
-
-  const options = {
-    method,
-    headers: isFormData ? {} : { 'Content-Type': 'application/json' },
-    agent: httpsAgent,
-    timeout: 30000
-  };
-
-  return new Promise((resolve, reject) => {
-    const request = https.request(url, options, response => {
-      let responseData = '';
-
-      response.on('data', chunk => responseData += chunk);
-      response.on('end', () => {
-        try {
-          const parsed = JSON.parse(responseData);
-          response.statusCode >= 400 ? reject(new Error(parsed.error?.message || responseData)) : resolve(parsed);
-        } catch (err) {
-          reject(new Error(`Invalid JSON: ${responseData}`));
-        }
-      });
-    });
-
-    request.on('error', reject);
-    request.on('timeout', () => reject(new Error('Request timeout')));
-
-    if (data && !isFormData) {
-      request.write(typeof data === 'string' ? data : JSON.stringify(data));
-    }
-
-    if (isFormData && data) {
-      data.pipe(request);
-    } else {
-      request.end();
-    }
-  });
-};
-
-// File upload with multipart/form-data
-const uploadFile = async (senderId, filePath, type, token) => {
-  const FormData = require('form-data');
-  const form = new FormData();
-
-  try {
-    const stats = statSync(filePath);
-    if (stats.size > 25 * 1024 * 1024) throw new Error('File too large (max 25MB)');
-
-    form.append('recipient', JSON.stringify({ id: senderId }));
-    form.append('message', JSON.stringify({
-      attachment: { type, payload: { is_reusable: true } }
-    }));
-    form.append('filedata', createReadStream(filePath), basename(filePath));
-
-    const response = await sendRequest({
-      endpoint: '/me/messages',
-      data: form,
-      token,
-      isFormData: true
-    });
-
-    return response;
-  } catch (error) {
-    throw new Error(`Upload failed: ${error.message}`);
+// fetch wrapper
+const apiRequest = async (url, options, pageAccessToken) => {
+  const response = await fetch(`${url}?access_token=${pageAccessToken}`, options);
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`API Error: ${response.status} - ${error}`);
   }
+  
+  return response.json();
 };
 
-// Typing indicator control
-const setTyping = (senderId, action, token) => 
-  sendRequest({
-    endpoint: '/me/messages',
-    data: { recipient: { id: senderId }, sender_action: action },
-    token
-  }).catch(() => {}); // Ignore typing errors
+// Set typing indicator
+const setTyping = (senderId, action, pageAccessToken) => 
+  apiRequest(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      recipient: { id: senderId },
+      sender_action: action
+    })
+  }, pageAccessToken);
 
-// Main message sending function
-const sendMessage = async (senderId, messageData, token) => {
-  if (!senderId || !token) throw new Error('Missing senderId or token');
+// Upload file attachment
+const uploadAttachment = async (filePath, type, pageAccessToken) => {
+  const formData = new FormData();
+  formData.append('message', JSON.stringify({
+    attachment: { type, payload: { is_reusable: true } }
+  }));
+  formData.append('filedata', new File([fs.readFileSync(filePath)], path.basename(filePath)));
+  
+  const result = await apiRequest(UPLOAD_URL, { method: 'POST', body: formData }, pageAccessToken);
+  return result.attachment_id;
+};
 
-  const { text, attachment, quick_replies = [], buttons = [] } = messageData;
-
+const sendMessage = async (senderId, message, pageAccessToken) => {
+  const { text = '', attachment = null, quick_replies = [], buttons = [] } = message;
+  
   if (!text && !attachment) return;
-
+  
   try {
-    // Start typing indicator
-    await setTyping(senderId, 'typing_on', token);
-
-    // Handle file uploads
-    if (attachment?.filePath) {
-      const result = await uploadFile(senderId, attachment.filePath, attachment.type || 'file', token);
-      await setTyping(senderId, 'typing_off', token);
-      return result;
-    }
-
-    // Build message payload
-    const message = {};
-
+    await setTyping(senderId, 'typing_on', pageAccessToken);
+    
+    let messagePayload = { recipient: { id: senderId }, message: {} };
+    
     // Button template
-    if (buttons.length > 0) {
-      message.attachment = {
+    if (buttons.length) {
+      messagePayload.message.attachment = {
         type: 'template',
         payload: {
           template_type: 'button',
           text: text || 'Choose an option:',
-          buttons: buttons.slice(0, 3).map(btn => ({
-            type: btn.type || 'postback',
+          buttons: buttons.map(btn => ({
+            type: 'postback',
             title: btn.title,
-            payload: btn.payload,
-            ...(btn.url && { url: btn.url })
+            payload: btn.payload
           }))
         }
       };
-    } else {
-      // Text message with optional quick replies
-      if (text) {
-        message.text = text.length > 2000 ? text.slice(0, 2000) + '...' : text;
-
-        if (quick_replies.length > 0) {
-          message.quick_replies = quick_replies.slice(0, 13).map(q => ({
-            content_type: 'text',
-            title: q.title.slice(0, 20),
-            payload: q.payload
-          }));
-        }
-      }
-
-      // Attachment handling
-      if (attachment) {
-        if (attachment.type === 'template') {
-          message.attachment = {
-            type: 'template',
-            payload: attachment.payload
-          };
-        } else {
-          message.attachment = {
-            type: attachment.type,
-            payload: attachment.payload || {}
-          };
-        }
+    }
+    // Text with quick replies
+    else if (text) {
+      messagePayload.message.text = text;
+      
+      if (quick_replies.length) {
+        messagePayload.message.quick_replies = quick_replies.map(qr => ({
+          content_type: 'text',
+          title: qr.title,
+          payload: qr.payload
+        }));
       }
     }
-
-    // Send message
-    const response = await sendRequest({
-      endpoint: '/me/messages',
-      data: { recipient: { id: senderId }, message },
-      token
-    });
-
-    // Stop typing
-    await setTyping(senderId, 'typing_off', token);
-
-    console.log(`✅ Message sent to ${senderId}`);
-    return response;
-
+    
+    // Handle attachments
+    if (attachment) {
+      // Direct file upload
+      if (attachment.filePath) {
+        const formData = new FormData();
+        formData.append('recipient', JSON.stringify({ id: senderId }));
+        formData.append('message', JSON.stringify({
+          attachment: { type: attachment.type, payload: {} }
+        }));
+        formData.append('filedata', new File(
+          [fs.readFileSync(attachment.filePath)], 
+          path.basename(attachment.filePath)
+        ));
+        
+        await apiRequest(API_URL, { method: 'POST', body: formData }, pageAccessToken);
+        await setTyping(senderId, 'typing_off', pageAccessToken);
+        return;
+      }
+      
+      // Template or URL attachment
+      if (attachment.type === 'template') {
+        messagePayload.message.attachment = {
+          type: 'template',
+          payload: attachment.payload
+        };
+      } else {
+        messagePayload.message.attachment = {
+          type: attachment.type,
+          payload: attachment.payload || {}
+        };
+      }
+    }
+    
+    await apiRequest(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(messagePayload)
+    }, pageAccessToken);
+    
+    await setTyping(senderId, 'typing_off', pageAccessToken);
+    
   } catch (error) {
-    await setTyping(senderId, 'typing_off', token);
-    console.error(`❌ Send error:`, error.message);
+    console.error('Send message error:', error.message);
     throw error;
   }
 };
 
-module.exports = { sendMessage, sendRequest, uploadFile };
+module.exports = { sendMessage };
