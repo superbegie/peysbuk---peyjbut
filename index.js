@@ -8,8 +8,14 @@ const app = express();
 app.use(express.json());
 
 const VERIFY_TOKEN = 'pagebot';
-const PAGE_ACCESS_TOKEN = (await fs.readFile('token.txt', 'utf8')).trim();
 const COMMANDS_PATH = path.join(__dirname, 'commands');
+
+let PAGE_ACCESS_TOKEN;
+
+// Load token asynchronously
+const loadToken = async () => {
+  PAGE_ACCESS_TOKEN = (await fs.readFile('token.txt', 'utf8')).trim();
+};
 
 // Webhook verification
 app.get('/webhook', (req, res) => {
@@ -85,16 +91,34 @@ const setupMenu = async () => {
 };
 
 // Watch for command changes
-const watcher = fs.watch(COMMANDS_PATH);
-for await (const { eventType, filename } of watcher) {
-  if (eventType === 'change' && filename?.endsWith('.js')) {
-    setupMenu();
+const startWatcher = async () => {
+  try {
+    const watcher = fs.watch(COMMANDS_PATH);
+    for await (const { eventType, filename } of watcher) {
+      if (eventType === 'change' && filename?.endsWith('.js')) {
+        setupMenu();
+      }
+    }
+  } catch (error) {
+    console.error('File watcher error:', error.message);
   }
-}
+};
 
 // Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  setupMenu();
-});
+const startServer = async () => {
+  try {
+    await loadToken();
+    
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      setupMenu();
+      startWatcher(); // Start file watcher
+    });
+  } catch (error) {
+    console.error('Server startup failed:', error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
