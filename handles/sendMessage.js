@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const FormData = require('form-data');
 
 const API_URL = 'https://graph.facebook.com/v23.0/me/messages';
 const UPLOAD_URL = 'https://graph.facebook.com/v23.0/me/message_attachments';
 
-// fetch wrapper
+// Unified fetch wrapper
 const apiRequest = async (url, options, pageAccessToken) => {
   const response = await fetch(`${url}?access_token=${pageAccessToken}`, options);
   
@@ -33,9 +34,19 @@ const uploadAttachment = async (filePath, type, pageAccessToken) => {
   formData.append('message', JSON.stringify({
     attachment: { type, payload: { is_reusable: true } }
   }));
-  formData.append('filedata', new File([fs.readFileSync(filePath)], path.basename(filePath)));
+  formData.append('filedata', fs.createReadStream(filePath));
   
-  const result = await apiRequest(UPLOAD_URL, { method: 'POST', body: formData }, pageAccessToken);
+  const response = await fetch(`${UPLOAD_URL}?access_token=${pageAccessToken}`, {
+    method: 'POST',
+    body: formData,
+    headers: formData.getHeaders()
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Upload failed: ${response.status}`);
+  }
+  
+  const result = await response.json();
   return result.attachment_id;
 };
 
@@ -86,12 +97,18 @@ const sendMessage = async (senderId, message, pageAccessToken) => {
         formData.append('message', JSON.stringify({
           attachment: { type: attachment.type, payload: {} }
         }));
-        formData.append('filedata', new File(
-          [fs.readFileSync(attachment.filePath)], 
-          path.basename(attachment.filePath)
-        ));
+        formData.append('filedata', fs.createReadStream(attachment.filePath));
         
-        await apiRequest(API_URL, { method: 'POST', body: formData }, pageAccessToken);
+        const response = await fetch(`${API_URL}?access_token=${pageAccessToken}`, {
+          method: 'POST',
+          body: formData,
+          headers: formData.getHeaders()
+        });
+        
+        if (!response.ok) {
+          throw new Error(`File upload failed: ${response.status}`);
+        }
+        
         await setTyping(senderId, 'typing_off', pageAccessToken);
         return;
       }
