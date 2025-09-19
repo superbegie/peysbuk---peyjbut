@@ -10,29 +10,18 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@distube/ytsr": "^2.0.4",
-    "@lyrra-evanth/src-yt": "^1.2.0",
-    "@southctrl/musixmatch-lyrics": "^1.0.3",
     "@types/node": "^18.0.6",
     "axios": "^1.7.2",
     "body-parser": "^1.20.2",
-    "btch-downloader": "^4.1.27-lts",
     "cheerio": "^1.0.0",
     "express": "^4.21.2",
     "form-data": "^4.0.2",
     "fs-extra": "^11.3.0",
-    "genius-lyrics": "^4.4.7",
-    "hercai": "^14.0.3",
-    "llyrics": "^1.1.7",
-    "node-catbox": "^3.4.0",
     "node-fetch": "^3.3.2",
     "node-yt-dl": "^2.2.5",
     "punycode": "^2.3.1",
     "request": "^2.88.2",
-    "spotify-url-info": "^3.2.18",
-    "tempmail.lol": "^4.4.0",
-    "winston": "^3.13.0",
-    "ytdlp-nodejs": "^2.3.4"
+    "winston": "^3.13.0"
   },
   "engines": {
     "node": ">=20"
