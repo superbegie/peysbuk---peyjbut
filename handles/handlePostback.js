@@ -9,7 +9,9 @@ const handlePostback = async (event, pageAccessToken) => {
   try {
     if (payload === 'GET_STARTED') {
       return await sendMessage(senderId, {
-        text: '✧(・ω<)╯Hi I’m Kohi! Your friendly AI buddy, here to help out with whatever—questions, tasks, you name it. I’m always learning and getting better. So, what’s up today?\n\n☕✨ For the best experience, simply tap "Help" to see all the things I can do for you.',
+        text: 'Yo, I’m Kohi. Just your chill AI buddy—here to kick it and help with whatever you throw my way. Questions, random tasks, or just chatting, I got you.
+
+Wanna see what I can do? Hit "Help" and we’ll keep it simple.',
         quick_replies: [
           { content_type: 'text', title: 'Help', payload: 'CMD_HELP' }
         ]
