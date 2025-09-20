@@ -11,7 +11,7 @@ const handlePostback = async (event, pageAccessToken) => {
       return await sendMessage(senderId, {
         text: '👋 Welcome! Choose an option to get started:',
         quick_replies: [
-          { content_type: 'text', title: 'Show Help', payload: 'CMD_HELP' }
+          { content_type: 'text', title: 'Help', payload: 'CMD_HELP' }
         ]
       }, pageAccessToken);
     }
