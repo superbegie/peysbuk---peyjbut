@@ -92,8 +92,20 @@ const createMenuItems = (commands) => {
   }];
 };
 
+const clearMenu = async () => {
+  try {
+    await fetch(`${GRAPH_API}/messenger_profile?access_token=${PAGE_ACCESS_TOKEN}&fields=persistent_menu,get_started`, {
+      method: 'DELETE'
+    });
+  } catch (e) {
+    console.error('Menu clear warning:', e.message);
+  }
+};
+
 const setupMenu = async () => {
   try {
+    await clearMenu();
+    
     const commands = await loadCommands();
     const menuItems = createMenuItems(commands).slice(0, 3);
     
@@ -106,7 +118,7 @@ const setupMenu = async () => {
       }]
     });
 
-    console.log(`✅ Menu: ${commands.length} commands loaded`);
+    console.log(`✅ Menu refreshed: ${commands.length} commands loaded`);
   } catch (e) {
     console.error('❌ Menu setup failed:', e.message);
   }
