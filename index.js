@@ -25,72 +25,7 @@ const apiCall = async (endpoint, data) => {
   return response.json();
 };
 
-const loadCommands = async () => {
-  const files = await readdir(COMMANDS_PATH);
-  const commands = [];
-  
-  for (const file of files.filter(f => f.endsWith('.js'))) {
-    try {
-      delete require.cache[resolve(join(COMMANDS_PATH, file))];
-      const command = require(join(COMMANDS_PATH, file));
-      if (command.name && command.description) {
-        const names = Array.isArray(command.name) ? command.name : [command.name];
-        commands.push({ name: names[0], aliases: names.slice(1) });
-      }
-    } catch (e) {
-      console.error(`Failed loading ${file}:`, e.message);
-    }
-  }
-  
-  return commands.sort((a, b) => a.name.localeCompare(b.name));
-};
 
-const createMenuItems = (commands) => {
-  if (commands.length <= 3) {
-    return commands.map(cmd => ({
-      type: 'postback',
-      title: cmd.name.charAt(0).toUpperCase() + cmd.name.slice(1),
-      payload: `CMD_${cmd.name.toUpperCase()}`
-    }));
-  }
-
-  const groups = commands.reduce((acc, cmd) => {
-    const key = cmd.name.charAt(0).toUpperCase();
-    (acc[key] ||= []).push(cmd);
-    return acc;
-  }, {});
-
-  const groupNames = Object.keys(groups);
-  
-  if (groupNames.length <= 3) {
-    return groupNames.map(group => {
-      const cmds = groups[group];
-      return cmds.length === 1 ? {
-        type: 'postback',
-        title: cmds[0].name.charAt(0).toUpperCase() + cmds[0].name.slice(1),
-        payload: `CMD_${cmds[0].name.toUpperCase()}`
-      } : {
-        type: 'nested',
-        title: group,
-        call_to_actions: cmds.slice(0, 5).map(cmd => ({
-          type: 'postback',
-          title: cmd.name.charAt(0).toUpperCase() + cmd.name.slice(1),
-          payload: `CMD_${cmd.name.toUpperCase()}`
-        }))
-      };
-    });
-  }
-
-  return [{
-    type: 'nested',
-    title: 'All Commands',
-    call_to_actions: commands.slice(0, 5).map(cmd => ({
-      type: 'postback',
-      title: cmd.name.charAt(0).toUpperCase() + cmd.name.slice(1),
-      payload: `CMD_${cmd.name.toUpperCase()}`
-    }))
-  }];
-};
 
 const clearMenu = async () => {
   try {
@@ -106,8 +41,11 @@ const setupMenu = async () => {
   try {
     await clearMenu();
     
-    const commands = await loadCommands();
-    const menuItems = createMenuItems(commands).slice(0, 3);
+    const menuItems = [{
+      type: 'postback',
+      title: 'Help',
+      payload: 'CMD_HELP'
+    }];
     
     await apiCall('/messenger_profile', {
       get_started: { payload: 'GET_STARTED' },
@@ -118,7 +56,7 @@ const setupMenu = async () => {
       }]
     });
 
-    console.log(`✅ Menu refreshed: ${commands.length} commands loaded`);
+    console.log(`✅ Menu set to Help only`);
   } catch (e) {
     console.error('❌ Menu setup failed:', e.message);
   }
