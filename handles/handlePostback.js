@@ -19,10 +19,8 @@ const handlePostback = async (event, pageAccessToken) => {
     if (payload.startsWith('CMD_')) {
       const command = payload.slice(4).toLowerCase();
       
-      // Execute the command directly instead of just showing a message
       const { handleMessage } = require('./handleMessage');
       
-      // Create a fake message event to trigger the command
       const fakeEvent = {
         sender: { id: senderId },
         message: { text: `-${command}` }
