@@ -5,7 +5,6 @@ const FormData = require('form-data');
 const API_URL = 'https://graph.facebook.com/v23.0/me/messages';
 const UPLOAD_URL = 'https://graph.facebook.com/v23.0/me/message_attachments';
 
-// Unified fetch wrapper
 const apiRequest = async (url, options, pageAccessToken) => {
   const response = await fetch(`${url}?access_token=${pageAccessToken}`, options);
   
