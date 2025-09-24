@@ -67,7 +67,7 @@ const handleMessage = async (event, pageAccessToken) => {
     if (command) {
       await command.execute(senderId, args, pageAccessToken, event, sendMessage, imageCache);
     } else if (commands.has('ai')) {
-      // Fallback to AI with full message text
+
       await commands.get('ai').execute(senderId, [messageText], pageAccessToken, event, sendMessage, imageCache);
     } else {
       await sendMessage(senderId, { text: 'Unknown command. Type "help" for available commands.' }, pageAccessToken);
