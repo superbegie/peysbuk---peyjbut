@@ -2,11 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const { sendMessage } = require('./sendMessage');
 
-// Command registry and image cache
 const commands = new Map();
 const imageCache = new Map();
 const prefix = '-';
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL = 10 * 60 * 1000; 
 
 // Load commands on startup
 const loadCommands = () => {
@@ -27,7 +26,6 @@ const loadCommands = () => {
 
 loadCommands();
 
-// Clean expired cache entries
 setInterval(() => {
   const now = Date.now();
   for (const [key, value] of imageCache) {
@@ -56,7 +54,6 @@ const handleMessage = async (event, pageAccessToken) => {
   
   if (!messageText) return;
   
-  // Parse command
   const isCommand = messageText.startsWith(prefix);
   const [commandName, ...args] = isCommand 
     ? messageText.slice(prefix.length).split(' ')
@@ -68,7 +65,6 @@ const handleMessage = async (event, pageAccessToken) => {
     const command = commands.get(normalizedCommand);
     
     if (command) {
-      // If it's a recognized command, use the parsed args
       await command.execute(senderId, args, pageAccessToken, event, sendMessage, imageCache);
     } else if (commands.has('ai')) {
       // Fallback to AI with full message text
